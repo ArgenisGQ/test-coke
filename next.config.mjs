@@ -10,6 +10,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'cdn.simpleicons.org',
       },
+      {
+        output: 'standalone', // Esto optimiza el tamaño de la imagen Docker
+      },
+      
     ],
   },
 };
