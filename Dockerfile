@@ -1,12 +1,15 @@
 # Use official Node.js LTS image
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies
-COPY package.json pnpm-lock.yaml 
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -15,19 +18,24 @@ COPY . .
 RUN pnpm run build
 
 # Production image
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
+
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install only production dependencies
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --prod
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copy built files from builder
-COPY --from=builder /app/.next .next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
+# Copy only necessary files from builder
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Switch to non-root user
+USER nextjs
 
 EXPOSE 3000
-CMD ["pnpm", "run", "start"]
+ENV PORT=3000
+
+CMD ["node", "server.js"]
